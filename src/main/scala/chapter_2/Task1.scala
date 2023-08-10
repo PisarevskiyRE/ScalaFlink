@@ -1,18 +1,23 @@
 package chapter_2
 
-import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSource, SingleOutputStreamOperator}
+import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSource}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
 import org.apache.flink.api.common.functions.{FilterFunction, FlatMapFunction, MapFunction}
 import org.apache.flink.api.java.functions.KeySelector
 import org.apache.flink.util.Collector
-import org.apache.flink.api.java.tuple.Tuple2
+
+
+case class Word(var word: String , var count: Int) {
+  def this() = this("",0)
+}
+
 
 object Task1 extends App {
 
 
-  def countOfArticle() = {
+  val env = StreamExecutionEnvironment.getExecutionEnvironment
 
-    val env = StreamExecutionEnvironment.getExecutionEnvironment
+  def countOfArticle() = {
 
     val textStream: DataStreamSource[String] = env.fromElements(
       "The Apache Flink community is excited to announce the release of Flink ML!",
@@ -20,7 +25,6 @@ object Task1 extends App {
       "The library now includes thirty three feature engineering algorithms,",
       "making it a more comprehensive library for feature engineering tasks."
     )
-
 
     val words: DataStream[String] = textStream.flatMap(
       new FlatMapFunction[String, String] {
@@ -34,21 +38,18 @@ object Task1 extends App {
       override def filter(value: String): Boolean = (value == "the" || value == "a")
     })
 
-    val countArticles =  onlyArticles
-      .map(new MapFunction[String, (String, Int)] {
-        override def map(value: String): (String, Int) = (value, 1)
+    val countArticlesStream: DataStream[Word] =  onlyArticles
+      .map(new MapFunction[String, Word] {
+        override def map(value: String): Word = new Word(value,1)
       })
-      .keyBy(new KeySelector[(String, Int), Boolean] {
-        override def getKey(value: (String, Int)): Boolean =
-          value._1 == "the"
+      .keyBy(new KeySelector[Word, String] {
+        override def getKey(value: Word): String = value.word
       })
-      .reduce((a, b) => (a._1, a._2 + b._2))
+      .sum("count")
 
-
-
-    countArticles.print()
-    env.execute()
+    countArticlesStream.print()
   }
-  countOfArticle()
 
+  countOfArticle()
+  env.execute()
 }
