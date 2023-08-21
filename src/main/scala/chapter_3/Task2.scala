@@ -1,10 +1,9 @@
 package chapter_3
 
 import org.apache.flink.api.common.eventtime.{SerializableTimestampAssigner, WatermarkStrategy}
-import org.apache.flink.api.common.functions.AggregateFunction
 import org.apache.flink.api.java.functions.KeySelector
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
-import org.apache.flink.streaming.api.functions.windowing.{AllWindowFunction, ProcessAllWindowFunction, ProcessWindowFunction, WindowFunction}
+import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.util.Collector
@@ -12,8 +11,8 @@ import org.apache.flink.util.Collector
 import java.lang
 import java.time.Instant
 import scala.jdk.CollectionConverters._
-import org.apache.flink.streaming.api.windowing.assigners.{EventTimeSessionWindows, SlidingEventTimeWindows}
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator
+import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows
+
 
 object Task2 extends App {
 
@@ -66,18 +65,18 @@ object Task2 extends App {
                          elements: lang.Iterable[Booking],
                          out: Collector[String]): Unit = {
       val geoRegion = key
-            var maxBookingCount = 0
-            var minBookingCount = 0
+      var maxBookingCount = Int.MinValue
+      var minBookingCount =  Int.MaxValue
 
-            elements.asScala.foreach { booking =>
-              maxBookingCount = Math.max(maxBookingCount, booking.bookingCount)
-              minBookingCount = Math.min(minBookingCount, booking.bookingCount)
-            }
+      elements.asScala.foreach{
+        booking =>
+          maxBookingCount = Math.max(maxBookingCount, booking.bookingCount)
+          minBookingCount = Math.min(minBookingCount, booking.bookingCount)
+      }
 
-            val result = s"Тип-> $geoRegion Окно-> [${context.window.getStart} ${context.window.getEnd}] min-> $minBookingCount max-> $maxBookingCount"
-            out.collect(result)
-          }
-
+      val result = s"Тип-> $geoRegion Окно-> [${context.window.getStart} ${context.window.getEnd}] min-> $minBookingCount max-> $maxBookingCount"
+      out.collect(result)
+    }
   }
 
 
@@ -94,5 +93,23 @@ object Task2 extends App {
   slidingWindow.print()
   env.execute()
 
+  /*
+  8> Тип-> International Окно-> [1689379200000 1689379202000] min-> 4 max-> 12
+  2> Тип-> Domestic Окно-> [1689379200000 1689379202000] min-> 4 max-> 10
+  8> Тип-> International Окно-> [1689379201000 1689379203000] min-> 1 max-> 12
+  2> Тип-> Domestic Окно-> [1689379201000 1689379203000] min-> 0 max-> 10
+  8> Тип-> International Окно-> [1689379202000 1689379204000] min-> 1 max-> 1
+  2> Тип-> Domestic Окно-> [1689379202000 1689379204000] min-> 0 max-> 2
+  8> Тип-> International Окно-> [1689379205000 1689379207000] min-> 1 max-> 8
+  2> Тип-> Domestic Окно-> [1689379203000 1689379205000] min-> 2 max-> 2
+  8> Тип-> International Окно-> [1689379206000 1689379208000] min-> 1 max-> 8
+  2> Тип-> Domestic Окно-> [1689379205000 1689379207000] min-> 1 max-> 1
+  8> Тип-> International Окно-> [1689379207000 1689379209000] min-> 5 max-> 6
+  2> Тип-> Domestic Окно-> [1689379206000 1689379208000] min-> 1 max-> 1
+  8> Тип-> International Окно-> [1689379208000 1689379210000] min-> 2 max-> 6
+  2> Тип-> Domestic Окно-> [1689379207000 1689379209000] min-> 3 max-> 14
+  8> Тип-> International Окно-> [1689379209000 1689379211000] min-> 2 max-> 4
+  2> Тип-> Domestic Окно-> [1689379208000 1689379210000] min-> 3 max-> 14
+  */
 
 }
