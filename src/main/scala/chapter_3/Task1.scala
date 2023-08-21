@@ -2,16 +2,14 @@ package chapter_3
 
 import org.apache.flink.api.common.eventtime.{SerializableTimestampAssigner, WatermarkStrategy}
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
-import org.apache.flink.streaming.api.functions.windowing.{AllWindowFunction, ProcessAllWindowFunction}
+import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.util.Collector
-
 import java.lang
 import java.time.Instant
-import scala.collection.convert.ImplicitConversions.`iterable AsScalaIterable`
 import scala.jdk.CollectionConverters._
-import org.apache.flink.streaming.api.windowing.assigners. TumblingEventTimeWindows
+import org.apache.flink.streaming.api.windowing.assigners.EventTimeSessionWindows
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator
 
 object Task1 extends App {
@@ -58,7 +56,7 @@ object Task1 extends App {
             element.clickTime.toEpochMilli
           }
         }))
-    .windowAll(TumblingEventTimeWindows.of(Time.seconds(3)))
+    .windowAll(EventTimeSessionWindows.withGap(Time.seconds(3)))
     .process(new ClickCountProcessor)
 
 
@@ -66,7 +64,7 @@ object Task1 extends App {
     override def process(context: ProcessAllWindowFunction[Click, String, TimeWindow]#Context, elements: lang.Iterable[Click], out: Collector[String]): Unit = {
       val startTime = Instant.ofEpochMilli(context.window.getStart)
       val endTime = Instant.ofEpochMilli(context.window.getEnd)
-      val totalCount = elements.size
+      val totalCount = elements.asScala.size
       val output = s"Окно [$startTime - $endTime]: Кликов -> $totalCount"
       out.collect(output)
     }
@@ -75,13 +73,9 @@ object Task1 extends App {
   resultStream.print()
 
   env.execute()
-/*
-11> Окно [2023-07-15T00:00:09Z - 2023-07-15T00:00:12Z]: Кликов -> 4
-12> Окно [2023-07-15T00:00:12Z - 2023-07-15T00:00:15Z]: Кликов -> 2
-10> Окно [2023-07-15T00:00:06Z - 2023-07-15T00:00:09Z]: Кликов -> 2
-13> Окно [2023-07-15T00:00:18Z - 2023-07-15T00:00:21Z]: Кликов -> 1
-9> Окно [2023-07-15T00:00:03Z - 2023-07-15T00:00:06Z]: Кликов -> 4
-8> Окно [2023-07-15T00:00:00Z - 2023-07-15T00:00:03Z]: Кликов -> 5
-*/
-
+  /*
+    8> Окно [2023-07-15T00:00:18Z - 2023-07-15T00:00:21Z]: Кликов -> 1
+    6> Окно [2023-07-15T00:00:01Z - 2023-07-15T00:00:07Z]: Кликов -> 9
+    7> Окно [2023-07-15T00:00:08Z - 2023-07-15T00:00:15Z]: Кликов -> 8
+  */
 }

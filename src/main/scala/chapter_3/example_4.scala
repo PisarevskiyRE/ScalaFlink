@@ -114,9 +114,9 @@ object example_4 extends App {
 
 
 
-  streamReduce.print()
+ // streamReduce.print()
   streamAgg.print()
-  streamProces.print()
+ // streamProces.print()
 
 
 
