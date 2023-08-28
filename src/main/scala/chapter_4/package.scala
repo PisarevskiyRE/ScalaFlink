@@ -1,5 +1,7 @@
 import org.apache.flink.streaming.api.functions.source.SourceFunction
 
+import scala.math.abs
+
 package object generator {
 
   case class Click(
@@ -18,13 +20,16 @@ package object generator {
 
     private def generateClick(id: Long): Seq[Click] = {
       val events = (1 to batchSize)
-        .map(_ =>
+        .map(_ => {
+          val eventTime = abs(id - scala.util.Random.between(0L, 4L))
+
           Click(
             ClickGenerator.getUserId,
             ClickGenerator.getButton,
             ClickGenerator.getClickCount,
-            baseTime.plusSeconds(id)
+            baseTime.plusSeconds(eventTime)
           )
+        }
         )
 
       events
