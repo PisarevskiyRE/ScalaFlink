@@ -1,85 +1,103 @@
 //package chapter_5
 //
-//import generator._
-//import org.apache.flink.api.common.state.{MapStateDescriptor, ValueState, ValueStateDescriptor}
-//import org.apache.flink.api.common.typeinfo.{TypeInformation, Types}
-//import org.apache.flink.api.java.functions.KeySelector
-//import org.apache.flink.streaming.api.datastream.{DataStream, DataStreamSource}
 //import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment
+//import org.apache.flink.api.common.eventtime.{SerializableTimestampAssigner, WatermarkStrategy}
+//import org.apache.flink.api.common.state.{MapState, MapStateDescriptor}
+//import org.apache.flink.api.common.typeinfo.TypeInformation
+//import org.apache.flink.api.java.functions.KeySelector
+//import org.apache.flink.streaming.api.datastream.DataStream
 //import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction
-//import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows
+//import org.apache.flink.streaming.api.windowing.assigners.{GlobalWindows, TumblingEventTimeWindows}
 //import org.apache.flink.streaming.api.windowing.evictors.CountEvictor
-//import org.apache.flink.streaming.api.windowing.triggers.{Trigger, TriggerResult}
-//import org.apache.flink.streaming.api.windowing.windows.GlobalWindow
+//import org.apache.flink.streaming.api.windowing.time.Time
+//import org.apache.flink.streaming.api.windowing.windows.{GlobalWindow, TimeWindow}
 //import org.apache.flink.util.{Collector, OutputTag}
 //
 //import java.lang
 //import java.time.Instant
-//import scala.jdk.CollectionConverters._
+//import org.apache.flink.streaming.api.windowing.triggers.{Trigger, TriggerResult}
 //
+//import scala.jdk.CollectionConverters.IterableHasAsScala
 //
-//object Task1 extends App{
-//  val env = StreamExecutionEnvironment
-//    .getExecutionEnvironment
+//object Task1_b extends App{
 //
+//  val env = StreamExecutionEnvironment.getExecutionEnvironment
 //
-//  val startTime: Instant =
-//    Instant.parse("2023-07-30T00:00:00.000Z")
+//  val errorOutputTag = new OutputTag[(String, Long)]("error-output"){}
 //
-//  val events: DataStreamSource[Event] = env.addSource(new EventGenerator(10, 1))
+//  val events = env.addSource(new EventGenerator(10, 5))
+//    .assignTimestampsAndWatermarks(
+//      WatermarkStrategy
+//        .forBoundedOutOfOrderness(java.time.Duration.ofSeconds(1))
+//        .withTimestampAssigner(new SerializableTimestampAssigner[Event] {
+//          override def extractTimestamp(element: Event, recordTimestamp: Long): Long = {
+//            element.eventTime
+//          }
+//        }))
 //
-//
-//  val errorOutputTag = new OutputTag[Event]("error-output"){}
-//
-//  val result: DataStream[String] = events
+//  val installUninstallCount = events
 //    .keyBy(new KeySelector[Event, String] {
 //      override def getKey(value: Event): String = value.store
 //    })
 //    .window(GlobalWindows.create())
 //    .trigger(new CustomTrigger())
-//    .evictor(CountEvictor.of(50, true))
 //    .process(new ProcessWindowFunction[Event, String, String, GlobalWindow] {
 //
-//      override def process( key: String,
-//                            context: ProcessWindowFunction[Event, String, String, GlobalWindow]#Context,
-//                            elements: lang.Iterable[Event],
-//                            out: Collector[String]): Unit = {
+//            override def process( key: String,
+//                                  context: ProcessWindowFunction[Event, String, String, GlobalWindow]#Context,
+//                                  elements: lang.Iterable[Event],
+//                                  out: Collector[String]): Unit = {
 //
-//        val topInstalls =
-//          elements
-//            .asScala
-//            .filter(_.eventType == "install")
-//            .toSeq
-//            .sortBy( _.eventTime)
-//            .take(3)
-//            .map(_.appId)
-//            .mkString(", ")
+//              val topInstalls =
+//                elements
+//                  .asScala
+//                  .filter(_.eventType == "install")
+//                  .toSeq
+//                  .sortBy( _.eventTime)
+//                  .take(3)
+//                  .map(_.appId)
+//                  .mkString(", ")
 //
-//        val topUninstalls =
-//          elements
-//            .asScala
-//            .filter(_.eventType == "uninstall")
-//            .toSeq
-//            .sortBy(_.eventTime)
-//            .take(3)
-//            .map(_.appId)
-//            .mkString(", ")
+//              val topUninstalls =
+//                elements
+//                  .asScala
+//                  .filter(_.eventType == "uninstall")
+//                  .toSeq
+//                  .sortBy(_.eventTime)
+//                  .take(3)
+//                  .map(_.appId)
+//                  .mkString(", ")
 //
-//        out.collect(s"Store: $key, Top Installs: [$topInstalls], Top Uninstalls: [$topUninstalls]")
-//      }
+//              out.collect(s"Store: $key, Top Installs: [$topInstalls], Top Uninstalls: [$topUninstalls]")
+//            }
+//          })
+//
+//
+//  val errorReport = events
+//    .filter(_.eventType == "error")
+//    .keyBy(new KeySelector[Event, String] {
+//      override def getKey(value: Event): String = value.store
+//    })
+//    .window(TumblingEventTimeWindows.of(Time.seconds(2)))
+//    .process(
+//      new ProcessWindowFunction[Event, (String, Long), String, TimeWindow] {
+//        override def process(key: String, context: ProcessWindowFunction[Event, (String, Long), String, TimeWindow]#Context, elements: lang.Iterable[Event], out: Collector[(String, Long)]): Unit = {
+//          val errorCount = elements.asScala.size
+//
+//          println("!!!"+(key, errorCount).toString())
+//          out.collect((key, errorCount))
+//        }
 //    })
 //
+//  //installUninstallCount.print()
 //
-//  result.print()
-//  env.execute()
+//  val errorStream: DataStream[(String, Long)] = errorReport.getSideOutput(errorOutputTag)
+//  errorStream.print()
+//
+//  env.execute
 //}
 //
-//import org.apache.flink.api.common.state.{MapState, MapStateDescriptor, ValueStateDescriptor}
-//
-//
-//
 //case class AppStats(installs: Int, uninstalls: Int, errors: Int)
-//
 //
 //class CustomTrigger extends Trigger[Event, GlobalWindow] {
 //  override def onElement(
@@ -161,4 +179,3 @@
 //    state.clear()
 //  }
 //}
-//

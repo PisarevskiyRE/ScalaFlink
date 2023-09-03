@@ -2,17 +2,18 @@ package chapter_5
 
 import org.apache.flink.streaming.api.functions.source.{RichSourceFunction, SourceFunction}
 
+import java.time.{LocalDateTime, ZoneOffset}
+
 case class Event(
                   store: String,
                   appId: String,
                   eventType: String,
-                  eventTime: java.time.Instant
+                  eventTime: Long
                 )
 
 
 class EventGenerator(
                       batchSize: Int,
-                      baseTime: java.time.Instant,
                       millisBtwEvents: Int
                     ) extends RichSourceFunction[Event]{
   @volatile private var isRunning = true
@@ -24,7 +25,7 @@ class EventGenerator(
           EventGenerator.getStore,
           EventGenerator.getAppId,
           EventGenerator.getEventType,
-          baseTime.plusSeconds(id)
+          LocalDateTime.now().atZone(ZoneOffset.UTC).toInstant().toEpochMilli
         )
       )
     events
