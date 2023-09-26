@@ -70,12 +70,12 @@ object Task4_b extends App {
   }
 
 
-  val filePath = new Path(Constant.path)
+  val filePath: Path = new Path(Constant.path)
 
-  val env = StreamExecutionEnvironment
+  val env: StreamExecutionEnvironment = StreamExecutionEnvironment
     .getExecutionEnvironment
 
-  val csvSchema = CsvSchema
+  val csvSchema: CsvSchema = CsvSchema
     .builder()
     .addColumn("app_name")
     .addColumn("date")
@@ -99,13 +99,15 @@ object Task4_b extends App {
   /**
    * преобразуем сырые данные в типизированные, добавляем знак от даты события
    */
-  val typedStream = stream
+  val typedStream1 = stream
     .map(new MapFunction[Record, AppUsage] {
       override def map(value: Record): AppUsage = {
         AppUsage(value.app_name, value.date, value.time, value.duration)
       }
     })
-    .assignTimestampsAndWatermarks(
+
+
+  val typedStream: SingleOutputStreamOperator[AppUsage] =  typedStream1.assignTimestampsAndWatermarks(
         WatermarkStrategy
           .forBoundedOutOfOrderness(java.time.Duration.ofMillis(100))
           .withTimestampAssigner(new SerializableTimestampAssigner[AppUsage] {
@@ -268,7 +270,7 @@ object Task4_b extends App {
    * 1. сколько часов часов в день пользователь в среднем тратит на сон
    */
 
-  val averageSleepDurationPerDay = filteredStream
+  val averageSleepDurationPerDay: SingleOutputStreamOperator[String] = filteredStream
     .keyBy(new KeySelector[AppUsage, Int] {
       override def getKey(value: AppUsage): Int = 1
     })
